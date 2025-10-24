@@ -52,7 +52,14 @@ export default function Canvas({ viewMode, contextMode, physicsMode, points, onP
     onPointsChangeRef.current = onPointsChange;
   }, [points, viewMode, contextMode, onPointsChange]);
 
-  const render = useCallback(() => {
+  const draggingPointRef = useRef(draggingPoint);
+  const renderFrameRef = useRef<() => void>();
+
+  useEffect(() => {
+    draggingPointRef.current = draggingPoint;
+  }, [draggingPoint]);
+
+  const renderFrame = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -63,7 +70,7 @@ export default function Canvas({ viewMode, contextMode, physicsMode, points, onP
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     // Update physics
-    if (physicsRef.current && physicsRef.current.mode !== 'static' && !draggingPoint) {
+    if (physicsRef.current && physicsRef.current.mode !== 'static' && !draggingPointRef.current) {
       currentPointsRef.current = physicsRef.current.update(currentPointsRef.current);
 
       // Throttled sync to parent state (for URL updates, etc.)
@@ -100,9 +107,11 @@ export default function Canvas({ viewMode, contextMode, physicsMode, points, onP
 
     // Continue animation only if physics is active or biology mode needs pulsing
     if ((physicsRef.current && physicsRef.current.mode !== 'static') || contextModeRef.current === 'biology') {
-      animationFrameRef.current = requestAnimationFrame(render);
+      animationFrameRef.current = requestAnimationFrame(renderFrameRef.current!);
     }
-  }, [draggingPoint, syncIntervalMs]);
+  }, [syncIntervalMs]);
+
+  renderFrameRef.current = renderFrame;
 
   // Manage animation loop based on physics mode
   useEffect(() => {
@@ -114,10 +123,10 @@ export default function Canvas({ viewMode, contextMode, physicsMode, points, onP
 
     // Start animation if needed
     if ((physicsRef.current && physicsRef.current.mode !== 'static') || contextMode === 'biology') {
-      render();
+      renderFrame();
     } else {
       // Just render once if static
-      render();
+      renderFrame();
     }
 
     return () => {
@@ -125,7 +134,7 @@ export default function Canvas({ viewMode, contextMode, physicsMode, points, onP
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, [physicsMode, contextMode, viewMode, points]);
+  }, [physicsMode, contextMode, viewMode, renderFrame]);
 
   const drawVoronoi = (ctx: CanvasRenderingContext2D, diagram: VoronoiDiagram) => {
     const cells = diagram.getVoronoiCells();
@@ -268,15 +277,15 @@ export default function Canvas({ viewMode, contextMode, physicsMode, points, onP
       );
       currentPointsRef.current = updatedPoints;
       onPointsChangeRef.current(updatedPoints);
-      if (physicsRef.current?.mode === 'static') {
-        render();
+      if (physicsRef.current?.mode === 'static' && renderFrameRef.current) {
+        renderFrameRef.current();
       }
     } else {
       const diagram = new VoronoiDiagram(currentPointsRef.current, canvas.width, canvas.height);
       const nearest = diagram.findNearestPoint(x, y, 20);
       setHoveredPoint(nearest);
-      if (physicsRef.current?.mode === 'static' && contextModeRef.current !== 'biology') {
-        render();
+      if (physicsRef.current?.mode === 'static' && contextModeRef.current !== 'biology' && renderFrameRef.current) {
+        renderFrameRef.current();
       }
     }
   };
