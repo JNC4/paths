@@ -24,6 +24,9 @@ export default function Canvas({ viewMode, contextMode, physicsMode, points, onP
   const currentPointsRef = useRef<Point[]>(points);
   const lastSyncTimeRef = useRef<number>(0);
   const syncIntervalMs = 100; // Sync to parent state every 100ms
+  const viewModeRef = useRef(viewMode);
+  const contextModeRef = useRef(contextMode);
+  const onPointsChangeRef = useRef(onPointsChange);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -41,10 +44,13 @@ export default function Canvas({ viewMode, contextMode, physicsMode, points, onP
     }
   }, [physicsMode]);
 
-  // Update current points ref when props change
+  // Update refs when props change
   useEffect(() => {
     currentPointsRef.current = points;
-  }, [points]);
+    viewModeRef.current = viewMode;
+    contextModeRef.current = contextMode;
+    onPointsChangeRef.current = onPointsChange;
+  }, [points, viewMode, contextMode, onPointsChange]);
 
   const render = useCallback(() => {
     const canvas = canvasRef.current;
@@ -57,14 +63,14 @@ export default function Canvas({ viewMode, contextMode, physicsMode, points, onP
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     // Update physics
-    if (physicsMode !== 'static' && !draggingPoint && physicsRef.current) {
+    if (physicsRef.current && physicsRef.current.mode !== 'static' && !draggingPoint) {
       currentPointsRef.current = physicsRef.current.update(currentPointsRef.current);
 
       // Throttled sync to parent state (for URL updates, etc.)
       const now = Date.now();
       if (now - lastSyncTimeRef.current > syncIntervalMs) {
         lastSyncTimeRef.current = now;
-        onPointsChange(currentPointsRef.current);
+        onPointsChangeRef.current(currentPointsRef.current);
       }
     }
 
@@ -72,41 +78,54 @@ export default function Canvas({ viewMode, contextMode, physicsMode, points, onP
 
     const diagram = new VoronoiDiagram(currentPointsRef.current, canvas.width, canvas.height);
 
-    // Draw based on view mode
-    if (viewMode === 'voronoi' || viewMode === 'both') {
+    // Draw based on view mode - use refs
+    if (viewModeRef.current === 'voronoi' || viewModeRef.current === 'both') {
       drawVoronoi(ctx, diagram);
     }
 
-    if (viewMode === 'delaunay' || viewMode === 'both') {
+    if (viewModeRef.current === 'delaunay' || viewModeRef.current === 'both') {
       drawDelaunay(ctx, diagram);
     }
 
-    if (viewMode === 'mst') {
+    if (viewModeRef.current === 'mst') {
       drawMST(ctx, diagram);
     }
 
-    if (viewMode === 'gabriel') {
+    if (viewModeRef.current === 'gabriel') {
       drawGabriel(ctx, diagram);
     }
 
-    // Draw points
-    drawPoints(ctx, currentPointsRef.current, contextMode);
+    // Draw points - use refs
+    drawPoints(ctx, currentPointsRef.current, contextModeRef.current);
 
-    // Continue animation
-    if (physicsMode !== 'static' || contextMode === 'biology') {
+    // Continue animation only if physics is active or biology mode needs pulsing
+    if ((physicsRef.current && physicsRef.current.mode !== 'static') || contextModeRef.current === 'biology') {
       animationFrameRef.current = requestAnimationFrame(render);
     }
-  }, [viewMode, contextMode, physicsMode, draggingPoint, onPointsChange, syncIntervalMs]);
+  }, [draggingPoint, syncIntervalMs]);
 
+  // Manage animation loop based on physics mode
   useEffect(() => {
-    render();
+    // Cancel any existing animation
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = undefined;
+    }
+
+    // Start animation if needed
+    if ((physicsRef.current && physicsRef.current.mode !== 'static') || contextMode === 'biology') {
+      render();
+    } else {
+      // Just render once if static
+      render();
+    }
 
     return () => {
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, [render]);
+  }, [physicsMode, contextMode, viewMode, points]);
 
   const drawVoronoi = (ctx: CanvasRenderingContext2D, diagram: VoronoiDiagram) => {
     const cells = diagram.getVoronoiCells();
@@ -248,15 +267,15 @@ export default function Canvas({ viewMode, contextMode, physicsMode, points, onP
         p.id === draggingPoint.id ? { ...p, x, y, vx: 0, vy: 0 } : p
       );
       currentPointsRef.current = updatedPoints;
-      onPointsChange(updatedPoints);
-      if (physicsMode === 'static') {
+      onPointsChangeRef.current(updatedPoints);
+      if (physicsRef.current?.mode === 'static') {
         render();
       }
     } else {
       const diagram = new VoronoiDiagram(currentPointsRef.current, canvas.width, canvas.height);
       const nearest = diagram.findNearestPoint(x, y, 20);
       setHoveredPoint(nearest);
-      if (physicsMode === 'static' && contextMode !== 'biology') {
+      if (physicsRef.current?.mode === 'static' && contextModeRef.current !== 'biology') {
         render();
       }
     }
@@ -289,7 +308,7 @@ export default function Canvas({ viewMode, contextMode, physicsMode, points, onP
       };
       const newPoints = [...currentPointsRef.current, newPoint];
       currentPointsRef.current = newPoints;
-      onPointsChange(newPoints);
+      onPointsChangeRef.current(newPoints);
     }
   };
 
@@ -309,7 +328,7 @@ export default function Canvas({ viewMode, contextMode, physicsMode, points, onP
     if (nearest) {
       const newPoints = currentPointsRef.current.filter(p => p.id !== nearest.id);
       currentPointsRef.current = newPoints;
-      onPointsChange(newPoints);
+      onPointsChangeRef.current(newPoints);
     }
   };
 
