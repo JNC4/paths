@@ -80,6 +80,9 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
+    // Skip URL updates during physics mode to prevent browser throttling
+    if (physicsMode !== 'static') return;
+
     if (points.length > 0) {
       const encoded = encodeURIComponent(JSON.stringify(points.map(p => ({
         id: p.id,
@@ -88,7 +91,7 @@ export default function Home() {
       }))));
       window.history.replaceState(null, '', `#${encoded}`);
     }
-  }, [points]);
+  }, [points, physicsMode]);
 
   const handleClearAll = () => {
     setPoints([]);

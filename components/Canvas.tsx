@@ -21,6 +21,9 @@ export default function Canvas({ viewMode, contextMode, physicsMode, points, onP
   const [draggingPoint, setDraggingPoint] = useState<Point | null>(null);
   const [hoveredPoint, setHoveredPoint] = useState<Point | null>(null);
   const physicsRef = useRef<PhysicsSimulation>();
+  const currentPointsRef = useRef<Point[]>(points);
+  const lastSyncTimeRef = useRef<number>(0);
+  const syncIntervalMs = 100; // Sync to parent state every 100ms
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -38,6 +41,11 @@ export default function Canvas({ viewMode, contextMode, physicsMode, points, onP
     }
   }, [physicsMode]);
 
+  // Update current points ref when props change
+  useEffect(() => {
+    currentPointsRef.current = points;
+  }, [points]);
+
   const render = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -49,15 +57,20 @@ export default function Canvas({ viewMode, contextMode, physicsMode, points, onP
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     // Update physics
-    let currentPoints = points;
     if (physicsMode !== 'static' && !draggingPoint && physicsRef.current) {
-      currentPoints = physicsRef.current.update(points);
-      onPointsChange(currentPoints);
+      currentPointsRef.current = physicsRef.current.update(currentPointsRef.current);
+
+      // Throttled sync to parent state (for URL updates, etc.)
+      const now = Date.now();
+      if (now - lastSyncTimeRef.current > syncIntervalMs) {
+        lastSyncTimeRef.current = now;
+        onPointsChange(currentPointsRef.current);
+      }
     }
 
-    if (currentPoints.length === 0) return;
+    if (currentPointsRef.current.length === 0) return;
 
-    const diagram = new VoronoiDiagram(currentPoints, canvas.width, canvas.height);
+    const diagram = new VoronoiDiagram(currentPointsRef.current, canvas.width, canvas.height);
 
     // Draw based on view mode
     if (viewMode === 'voronoi' || viewMode === 'both') {
@@ -77,13 +90,13 @@ export default function Canvas({ viewMode, contextMode, physicsMode, points, onP
     }
 
     // Draw points
-    drawPoints(ctx, currentPoints, contextMode);
+    drawPoints(ctx, currentPointsRef.current, contextMode);
 
     // Continue animation
     if (physicsMode !== 'static' || contextMode === 'biology') {
       animationFrameRef.current = requestAnimationFrame(render);
     }
-  }, [points, viewMode, contextMode, physicsMode, draggingPoint, onPointsChange]);
+  }, [viewMode, contextMode, physicsMode, draggingPoint, onPointsChange, syncIntervalMs]);
 
   useEffect(() => {
     render();
@@ -214,7 +227,7 @@ export default function Canvas({ viewMode, contextMode, physicsMode, points, onP
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
 
-    const diagram = new VoronoiDiagram(points, canvas.width, canvas.height);
+    const diagram = new VoronoiDiagram(currentPointsRef.current, canvas.width, canvas.height);
     const nearest = diagram.findNearestPoint(x, y, 20);
 
     if (nearest) {
@@ -231,16 +244,21 @@ export default function Canvas({ viewMode, contextMode, physicsMode, points, onP
     const y = e.clientY - rect.top;
 
     if (draggingPoint) {
-      const updatedPoints = points.map(p =>
+      const updatedPoints = currentPointsRef.current.map(p =>
         p.id === draggingPoint.id ? { ...p, x, y, vx: 0, vy: 0 } : p
       );
+      currentPointsRef.current = updatedPoints;
       onPointsChange(updatedPoints);
-      render();
+      if (physicsMode === 'static') {
+        render();
+      }
     } else {
-      const diagram = new VoronoiDiagram(points, canvas.width, canvas.height);
+      const diagram = new VoronoiDiagram(currentPointsRef.current, canvas.width, canvas.height);
       const nearest = diagram.findNearestPoint(x, y, 20);
       setHoveredPoint(nearest);
-      render();
+      if (physicsMode === 'static' && contextMode !== 'biology') {
+        render();
+      }
     }
   };
 
@@ -258,7 +276,7 @@ export default function Canvas({ viewMode, contextMode, physicsMode, points, onP
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
 
-    const diagram = new VoronoiDiagram(points, canvas.width, canvas.height);
+    const diagram = new VoronoiDiagram(currentPointsRef.current, canvas.width, canvas.height);
     const nearest = diagram.findNearestPoint(x, y, 20);
 
     if (!nearest) {
@@ -269,7 +287,9 @@ export default function Canvas({ viewMode, contextMode, physicsMode, points, onP
         vx: 0,
         vy: 0,
       };
-      onPointsChange([...points, newPoint]);
+      const newPoints = [...currentPointsRef.current, newPoint];
+      currentPointsRef.current = newPoints;
+      onPointsChange(newPoints);
     }
   };
 
@@ -283,11 +303,13 @@ export default function Canvas({ viewMode, contextMode, physicsMode, points, onP
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
 
-    const diagram = new VoronoiDiagram(points, canvas.width, canvas.height);
+    const diagram = new VoronoiDiagram(currentPointsRef.current, canvas.width, canvas.height);
     const nearest = diagram.findNearestPoint(x, y, 20);
 
     if (nearest) {
-      onPointsChange(points.filter(p => p.id !== nearest.id));
+      const newPoints = currentPointsRef.current.filter(p => p.id !== nearest.id);
+      currentPointsRef.current = newPoints;
+      onPointsChange(newPoints);
     }
   };
 

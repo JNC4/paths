@@ -6,7 +6,12 @@
       "Bash(npm run build:*)",
       "Bash(git init:*)",
       "Bash(git add:*)",
-      "Bash(git commit -m \"$(cat <<''EOF''\nInitial commit: Paths - Interactive Voronoi & Delaunay Visualization\n\nComplete implementation of interactive web app featuring:\n- Real-time Voronoi diagram and Delaunay triangulation computation\n- Multiple visualization modes (Voronoi, Delaunay, Both, MST, Gabriel Graph)\n- Three context modes (Abstract Math, City Planning, Biology)\n- Physics simulation (Static, Drift, Repel, Attract)\n- Interactive point manipulation (click to add, drag to move, right-click to delete)\n- Preset patterns (Grid, Spiral, Circle, Random)\n- Keyboard shortcuts for quick mode switching\n- URL sharing with encoded point positions\n- PNG export functionality\n- Smooth animations and military-style minimalist design\n- Responsive canvas with educational info sidebar\n\nBuilt with Next.js, TypeScript, d3-delaunay, and Framer Motion.\n\n🤖 Generated with Claude Code\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")"
+      "Bash(git commit -m \"$(cat <<''EOF''\nInitial commit: Paths - Interactive Voronoi & Delaunay Visualization\n\nComplete implementation of interactive web app featuring:\n- Real-time Voronoi diagram and Delaunay triangulation computation\n- Multiple visualization modes (Voronoi, Delaunay, Both, MST, Gabriel Graph)\n- Three context modes (Abstract Math, City Planning, Biology)\n- Physics simulation (Static, Drift, Repel, Attract)\n- Interactive point manipulation (click to add, drag to move, right-click to delete)\n- Preset patterns (Grid, Spiral, Circle, Random)\n- Keyboard shortcuts for quick mode switching\n- URL sharing with encoded point positions\n- PNG export functionality\n- Smooth animations and military-style minimalist design\n- Responsive canvas with educational info sidebar\n\nBuilt with Next.js, TypeScript, d3-delaunay, and Framer Motion.\n\n🤖 Generated with Claude Code\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
+      "Bash(git remote add:*)",
+      "Bash(git branch:*)",
+      "Bash(git push:*)",
+      "Bash(git commit:*)",
+      "Bash(npx vercel --prod --yes)"
     ],
     "deny": [],
     "ask": []
